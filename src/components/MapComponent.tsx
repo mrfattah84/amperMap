@@ -1,17 +1,14 @@
-import React, { useRef, useEffect, useState } from "react";
+import React, { useRef, useEffect } from "react";
 import maplibregl from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
-import { useSelector } from "react-redux";
-import { selectAllUsers } from "../userSlice";
+import { useGetExpandedOrdersQuery } from "../orderSlice";
 
 function MapComponent() {
-  const data = useSelector(selectAllUsers);
+  const { data: orders = [] } = useGetExpandedOrdersQuery();
 
   const mapContainer = useRef(null);
   // CHANGE 1: Use a ref for the map instance. It's not needed in state.
   const map = useRef(null);
-  // CHANGE 2: Use a ref to store markers. This prevents re-renders when markers are added/removed.
-  const markers = useRef({});
 
   function calcBounds(coords) {
     if (coords.length === 0) {
@@ -72,50 +69,38 @@ function MapComponent() {
 
   // Effect for updating markers and bounds when data changes
   useEffect(() => {
-    if (!map.current) return; // Don't do anything if map is not yet initialized
+    if (!map.current || !orders.length) return; // Don't do anything if map is not yet initialized or no orders
 
-    const activeUserCoords = [];
-    const currentMarkerIds = Object.keys(markers.current);
-    const dataUserIds = data.map((user) => user.id);
+    const markers = [];
+    const activeOrderCoords = [];
 
-    // First, remove markers for users that are no longer in the data or are inactive
-    currentMarkerIds.forEach((id) => {
-      const user = data.find((u) => u.id.toString() === id.toString());
-      if (!user || !user.active) {
-        markers.current[id].remove();
-        delete markers.current[id];
+    orders.forEach((order) => {
+      if (
+        order.active &&
+        order.location?.latitude &&
+        order.location?.longitude
+      ) {
+        const { longitude, latitude } = order.location;
+        activeOrderCoords.push([longitude, latitude]);
+        const marker = new maplibregl.Marker()
+          .setLngLat([longitude, latitude])
+          .addTo(map.current);
+        markers.push(marker);
       }
     });
 
-    // Next, add or update markers for active users
-    data.forEach((user) => {
-      if (user.latitude && user.longitude && user.active) {
-        activeUserCoords.push([user.longitude, user.latitude]);
-
-        // If marker exists, update its position. If not, create it.
-        if (markers.current[user.id]) {
-          markers.current[user.id].setLngLat([user.longitude, user.latitude]);
-        } else {
-          const pin = new maplibregl.Marker()
-            .setLngLat([user.longitude, user.latitude])
-            .addTo(map.current);
-          markers.current[user.id] = pin;
-        }
-      }
-    });
-
-    // CHANGE 3: Only fit bounds if there are active users to show
-    // This prevents the map from flying away when the last user becomes inactive.
-    if (activeUserCoords.length > 0) {
-      map.current.fitBounds(calcBounds(activeUserCoords), {
+    if (activeOrderCoords.length > 0) {
+      map.current.fitBounds(calcBounds(activeOrderCoords), {
         padding: 50,
         maxZoom: 14,
         duration: 1000,
       });
     }
 
-    // Since we are mutating a ref, `data` is the only dependency we need.
-  }, [data]);
+    return () => {
+      markers.forEach((marker) => marker.remove());
+    };
+  }, [orders]);
 
   return <div ref={mapContainer} style={{ width: "100%", height: "100%" }} />;
 }

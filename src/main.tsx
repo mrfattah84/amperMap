@@ -4,9 +4,9 @@ import "./index.css";
 import App from "./App.tsx";
 import { store } from "./store";
 import { Provider } from "react-redux";
-import { extendedApiSlice } from "./userSlice.ts";
+import { extendedApiSlice } from "./orderSlice.ts";
 
-store.dispatch(extendedApiSlice.endpoints.getUsers.initiate());
+store.dispatch(extendedApiSlice.endpoints.getOrders.initiate());
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
