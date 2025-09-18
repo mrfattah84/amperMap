@@ -12,7 +12,7 @@ function App() {
   const handleCloseDetails = () => setSelectedOrderId(null);
 
   return (
-    <div className="flex gap-2 w-dvw h-dvh relative">
+    <div className="flex gap-2 w-screen h-screen relative p-1">
       <div className="flex flex-col">
         <Input.Search
           className="mb-2"
@@ -29,7 +29,7 @@ function App() {
       <div className="flex-grow rounded-lg overflow-hidden">
         <MapComponent />
       </div>
-      <div className="absolute top-0 right-0 m-8">
+      <div className="absolute top-0 right-0 m-4">
         {selectedOrderId && (
           <OrderDetails
             orderId={selectedOrderId}

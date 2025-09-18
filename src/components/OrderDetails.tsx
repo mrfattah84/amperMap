@@ -1,32 +1,14 @@
-import React from "react";
 import { useGetOrderDetailsQuery } from "../orderSlice";
-import {
-  Card,
-  Spin,
-  Alert,
-  Tag,
-  Button,
-  List,
-  Typography,
-  Space,
-  Divider,
-  Descriptions,
-} from "antd";
+import { Card, Spin, Alert, Tag, Button, List, Descriptions } from "antd";
 import {
   TruckOutlined,
   UserOutlined,
   EnvironmentOutlined,
-  CarryOutOutlined,
-  DeliveredProcedureOutlined,
-  ToolOutlined,
   CloseOutlined,
   PhoneOutlined,
   MailOutlined,
   ClockCircleOutlined,
-  InfoCircleOutlined,
-  BoxPlotOutlined,
 } from "@ant-design/icons";
-import { Padding } from "maplibre-gl";
 
 type OrderDetailsProps = {
   orderId: number;
@@ -37,19 +19,6 @@ const getPriorityColor = (priority: string) => {
   if (priority === "High") return "red";
   if (priority === "Medium") return "orange";
   return "blue";
-};
-
-const getOrderIcon = (orderType: string) => {
-  switch (orderType) {
-    case "Delivery":
-      return <DeliveredProcedureOutlined className="mr-2" />;
-    case "Pickup":
-      return <CarryOutOutlined className="mr-2" />;
-    case "Service":
-      return <ToolOutlined className="mr-2" />;
-    default:
-      return <TruckOutlined className="mr-2" />;
-  }
 };
 
 const OrderDetails = ({ orderId, onClose }: OrderDetailsProps) => {
