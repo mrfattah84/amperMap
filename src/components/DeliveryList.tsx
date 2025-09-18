@@ -4,7 +4,7 @@ import { selectOrderIdsBySearch } from "../orderSlice";
 import { List } from "antd";
 import DeliveryCard from "./DeliveryCard";
 
-const DeliveryList = ({ searchTerm }) => {
+const DeliveryList = ({ searchTerm, onShowDetails }) => {
   const selectorderIds = React.useMemo(
     () => selectOrderIdsBySearch(searchTerm),
     [searchTerm]
@@ -18,7 +18,13 @@ const DeliveryList = ({ searchTerm }) => {
       className="grow overflow-auto bg-white flex gap-4 p-4"
       bordered
       dataSource={orderIds}
-      renderItem={(orderId) => <DeliveryCard key={orderId} orderId={orderId} />}
+      renderItem={(orderId) => (
+        <DeliveryCard
+          key={orderId}
+          orderId={orderId}
+          onShowDetails={onShowDetails}
+        />
+      )}
     />
   );
 };
