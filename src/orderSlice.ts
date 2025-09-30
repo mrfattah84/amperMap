@@ -47,16 +47,16 @@ export type Driver = {
 export type Order = {
   id: number;
   orderType: "Delivery" | "Pickup" | "Service";
-  date: string;
-  duration: number;
+  date?: string;
+  duration?: number;
   priority: "High" | "Medium" | "Low";
-  notes: string;
-  barcode: string;
+  notes?: string;
+  barcode?: string;
   locationId: number;
   contactId: number;
   driverId: number;
-  loads: Load[];
-  timeWindows: TimeWindow[];
+  loads?: Load[];
+  timeWindows?: TimeWindow[];
   active: boolean;
 };
 
@@ -71,7 +71,7 @@ export type ExpandedOrder = Order & {
 
 const orderAdapter = createEntityAdapter<Order>({
   selectId: (order) => order.id,
-  sortComparer: (a, b) => b.date.localeCompare(a.date), // Show newest first
+  sortComparer: (a, b) => b.id - a.id, // Show newest first by ID
 });
 
 const initialState = orderAdapter.getInitialState();
@@ -107,6 +107,11 @@ export const extendedApiSlice = apiSlice.injectEndpoints({
           : [{ type: "Order", id: "LIST" }],
     }),
 
+    // Query to get all drivers
+    getDrivers: builder.query<Driver[], void>({
+      query: () => "/drivers",
+    }),
+
     // Query to get a single order with its related driver, contact, and location
     getOrderDetails: builder.query<ExpandedOrder, number>({
       query: (orderId) =>
@@ -114,14 +119,57 @@ export const extendedApiSlice = apiSlice.injectEndpoints({
       providesTags: (result, error, arg) => [{ type: "Order", id: arg }],
     }),
 
+    // Mutation to add a new contact
+    addContact: builder.mutation<Contact, Partial<Contact>>({
+      query: (newContact) => ({
+        url: "/contacts",
+        method: "POST",
+        body: newContact,
+      }),
+    }),
+
+    // Mutation to add a new location
+    addLocation: builder.mutation<Location, Partial<Location>>({
+      query: (newLocation) => ({
+        url: "/locations",
+        method: "POST",
+        body: newLocation,
+      }),
+    }),
+
     // Mutation to add a new order
-    addNewOrder: builder.mutation<Order, Omit<Order, "id">>({
-      query: (initialOrder) => ({
+    addOrder: builder.mutation<Order, Partial<Order>>({
+      query: (newOrder) => ({
         url: "/orders",
         method: "POST",
-        body: initialOrder,
+        body: newOrder,
       }),
-      invalidatesTags: [{ type: "Order", id: "LIST" }],
+      async onQueryStarted(newOrder, { dispatch, queryFulfilled }) {
+        // Invalidate the 'LIST' tag for getExpandedOrders to ensure it refetches.
+        // This is simpler and safer than manually updating it, as other parts of the app might use it.
+        const expandedOrdersPromise = dispatch(
+          extendedApiSlice.util.invalidateTags([{ type: "Order", id: "LIST" }])
+        );
+
+        try {
+          const { data: addedOrder } = await queryFulfilled;
+          // Manually update the normalized 'getOrders' cache
+          dispatch(
+            extendedApiSlice.util.updateQueryData(
+              "getOrders",
+              undefined,
+              (draft) => {
+                // The `getOrders` endpoint uses an entity adapter, so we use `addOne`
+                if (addedOrder) {
+                  orderAdapter.addOne(draft, addedOrder);
+                }
+              }
+            )
+          );
+        } catch {}
+
+        await expandedOrdersPromise;
+      },
     }),
 
     // Mutation to update an existing order with optimistic updates
@@ -211,9 +259,12 @@ export const extendedApiSlice = apiSlice.injectEndpoints({
 export const {
   useGetOrdersQuery,
   useGetExpandedOrdersQuery,
+  useGetDriversQuery,
   useGetOrderDetailsQuery,
-  useAddNewOrderMutation,
+  useAddOrderMutation,
   useUpdateOrderMutation,
+  useAddContactMutation,
+  useAddLocationMutation,
   useChangeActiveMutation, // <-- Export the new hook
   useDeleteOrderMutation,
 } = extendedApiSlice;
@@ -268,8 +319,8 @@ export const selectOrderIdsBySearch = (search: string) =>
     return orders
       .filter(
         (order) =>
-          order.notes.toLowerCase().includes(lowerCaseSearch) ||
-          order.barcode.toLowerCase().includes(lowerCaseSearch)
+          order.notes?.toLowerCase().includes(lowerCaseSearch) ||
+          order.barcode?.toLowerCase().includes(lowerCaseSearch)
       )
       .map((order) => order.id);
   });

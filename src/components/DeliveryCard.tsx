@@ -12,6 +12,8 @@ import {
   DeliveredProcedureOutlined,
   ToolOutlined,
 } from "@ant-design/icons";
+import { useAppDispatch } from "../hooks";
+import { fitBounds } from "../mapSlice";
 
 type DeliveryCardProps = {
   orderId: number;
@@ -26,6 +28,7 @@ const DeliveryCard = React.memo(
       isError,
     } = useGetOrderDetailsQuery(orderId);
     const [changeActive] = useChangeActiveMutation();
+    const dispatch = useAppDispatch();
 
     if (isLoading) {
       return <Spin />;
@@ -34,6 +37,10 @@ const DeliveryCard = React.memo(
     if (isError || !order) {
       return <Alert message="Error loading order details" type="error" />;
     }
+
+    const handleShowDetails = () => {
+      onShowDetails(order.id);
+    };
 
     const getPriorityColor = (priority) => {
       if (priority === "High") return "red";
@@ -56,7 +63,7 @@ const DeliveryCard = React.memo(
 
     return (
       <Card
-        className="w-full"
+        style={{ marginBottom: 4 }}
         key={order.id}
         title={
           <div className="flex justify-between items-center">
@@ -88,7 +95,7 @@ const DeliveryCard = React.memo(
             <TruckOutlined className="mr-2" />
             <strong>Driver:</strong> {order.driver?.name}
           </p>
-          <Button onClick={() => onShowDetails(order.id)}>Show More...</Button>
+          <Button onClick={handleShowDetails}>Show More...</Button>
         </div>
       </Card>
     );

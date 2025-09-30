@@ -1,7 +1,7 @@
 import React from "react";
 import { useSelector } from "react-redux";
 import { selectOrderIdsBySearch } from "../orderSlice";
-import { List } from "antd";
+import { FloatButton, List } from "antd";
 import DeliveryCard from "./DeliveryCard";
 
 const DeliveryList = ({ searchTerm, onShowDetails }) => {
@@ -14,18 +14,18 @@ const DeliveryList = ({ searchTerm, onShowDetails }) => {
   const orderIds = useSelector((state) => selectorderIds(state, searchTerm));
 
   return (
-    <List
-      className="grow overflow-auto bg-white flex gap-4 p-4"
-      bordered
-      dataSource={orderIds}
-      renderItem={(orderId) => (
-        <DeliveryCard
-          key={orderId}
-          orderId={orderId}
-          onShowDetails={onShowDetails}
-        />
-      )}
-    />
+    <div className="relative overflow-auto w-full h-full">
+      <List
+        dataSource={orderIds}
+        renderItem={(orderId) => (
+          <DeliveryCard
+            key={orderId}
+            orderId={orderId}
+            onShowDetails={onShowDetails}
+          />
+        )}
+      />
+    </div>
   );
 };
 

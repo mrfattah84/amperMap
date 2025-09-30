@@ -1,14 +1,19 @@
 import React, { useRef, useEffect } from "react";
 import maplibregl from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
-import { useGetExpandedOrdersQuery } from "../orderSlice";
+import { ExpandedOrder, useGetExpandedOrdersQuery } from "../orderSlice";
+import createNumberedPin from "./customMarker";
+import { useAppDispatch } from "../hooks";
+import { fitBounds, setMapInstance } from "../mapSlice";
 
-function MapComponent() {
+function MapComponent({ onMarkerClick }) {
   const { data: orders = [] } = useGetExpandedOrdersQuery();
+  const dispatch = useAppDispatch();
 
   const mapContainer = useRef(null);
-  // CHANGE 1: Use a ref for the map instance. It's not needed in state.
   const map = useRef(null);
+  // Use a ref to keep track of markers to clean them up
+  const markersRef = useRef([]);
 
   function calcBounds(coords) {
     if (coords.length === 0) {
@@ -60,21 +65,30 @@ function MapComponent() {
       },
     });
 
+    dispatch(setMapInstance(map.current));
+
     // Cleanup function to remove map on component unmount
     return () => {
       map.current.remove();
       map.current = null;
+      dispatch(setMapInstance(null));
     };
-  }, []); // Empty dependency array ensures this runs only once
+  }, [dispatch]); // Empty dependency array ensures this runs only once
 
   // Effect for updating markers and bounds when data changes
   useEffect(() => {
     if (!map.current || !orders.length) return; // Don't do anything if map is not yet initialized or no orders
 
-    const markers = [];
+    markersRef.current.forEach((marker) => marker.remove());
+    markersRef.current = [];
     const activeOrderCoords = [];
 
-    orders.forEach((order) => {
+    const activeOrders = orders.filter(
+      (order) =>
+        order.active && order.location?.latitude && order.location?.longitude
+    );
+
+    activeOrders.forEach((order: ExpandedOrder) => {
       if (
         order.active &&
         order.location?.latitude &&
@@ -82,25 +96,49 @@ function MapComponent() {
       ) {
         const { longitude, latitude } = order.location;
         activeOrderCoords.push([longitude, latitude]);
-        const marker = new maplibregl.Marker()
+
+        // Create a DOM element for the marker.
+        const el = document.createElement("div");
+        el.innerHTML = createNumberedPin(order.id, order.color);
+
+        const popup = new maplibregl.Popup({
+          offset: 25,
+          className: "text-black",
+          closeButton: false,
+        }).setText(order.contact.name);
+
+        const marker = new maplibregl.Marker({ element: el })
           .setLngLat([longitude, latitude])
+          .setPopup(popup)
           .addTo(map.current);
-        markers.push(marker);
+
+        // Get the marker's DOM element and add event listeners
+        const markerElement = marker.getElement();
+
+        markerElement.addEventListener("mouseenter", () =>
+          marker.togglePopup()
+        );
+        markerElement.addEventListener("mouseleave", () =>
+          marker.togglePopup()
+        );
+
+        markerElement.addEventListener("click", () => {
+          onMarkerClick(order.id);
+        });
+
+        markersRef.current.push(marker);
       }
     });
 
     if (activeOrderCoords.length > 0) {
-      map.current.fitBounds(calcBounds(activeOrderCoords), {
-        padding: 50,
-        maxZoom: 14,
-        duration: 1000,
-      });
+      dispatch(fitBounds(calcBounds(activeOrderCoords)));
     }
 
     return () => {
-      markers.forEach((marker) => marker.remove());
+      markersRef.current.forEach((marker) => marker.remove());
+      markersRef.current = [];
     };
-  }, [orders]);
+  }, [orders, dispatch, onMarkerClick]);
 
   return <div ref={mapContainer} style={{ width: "100%", height: "100%" }} />;
 }
