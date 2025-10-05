@@ -6,6 +6,7 @@ import {
   EntityState,
 } from "@reduxjs/toolkit";
 import { apiSlice } from "./api/apiSlice";
+import socketIOClient from "socket.io-client";
 
 // ## 1. Type Definitions ##
 // These types should match the structure of your db.json file.
@@ -42,6 +43,7 @@ export type Driver = {
   name: string;
   skills: string[];
   vehicleFeatures: string[];
+  geojson?: any; // Allow for a geojson property
 };
 
 export type Order = {
@@ -110,6 +112,36 @@ export const extendedApiSlice = apiSlice.injectEndpoints({
     // Query to get all drivers
     getDrivers: builder.query<Driver[], void>({
       query: () => "/drivers",
+      async onCacheEntryAdded(
+        arg,
+        { updateCachedData, cacheDataLoaded, cacheEntryRemoved }
+      ) {
+        // Establish a WebSocket connection
+        const socket = socketIOClient("http://localhost:3030");
+        try {
+          await cacheDataLoaded;
+          socket.on("driverUpdate", (updatedDrivers) => {
+            updatedDrivers.features.forEach((updatedDriver) => {
+              updateCachedData((draft) => {
+                const index = draft.findIndex((d) => d.id === updatedDriver.id);
+                if (index !== -1) {
+                  draft[index].geojson = updatedDriver;
+                } else {
+                  console.warn(
+                    `Driver with ID ${updatedDriver.id} not found in cache.`
+                  );
+                }
+              });
+            });
+          });
+          await cacheEntryRemoved;
+        } catch {
+          console.log("err with socket");
+        }
+
+        await cacheEntryRemoved;
+        socket.disconnect();
+      },
     }),
 
     // Query to get a single order with its related driver, contact, and location
@@ -299,6 +331,24 @@ const selectExpandedOrdersData = createSelector(
 export const selectAllExpandedOrders = createSelector(
   selectExpandedOrdersData,
   (orders) => orders ?? []
+);
+
+export const selectDriversResult =
+  extendedApiSlice.endpoints.getDrivers.select();
+
+// Memoized selector to get the normalized order data
+const selectDriversData = createSelector(
+  selectDriversResult,
+  (driversResult) => driversResult.data // normalized state object with ids & entities
+);
+
+// Export the standard entity adapter selectors
+export const {
+  selectAll: selectAllDrivers,
+  selectById: selectDriverById,
+  selectIds: selectDriverIds,
+} = orderAdapter.getSelectors(
+  (state: any) => selectDriversData(state) ?? initialState
 );
 
 // ## Custom Memoized Selectors ##

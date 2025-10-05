@@ -3,7 +3,7 @@ import {
   useChangeActiveMutation,
   useGetOrderDetailsQuery,
 } from "../orderSlice";
-import { Card, Switch, Tag, Spin, Alert, Button } from "antd";
+import { Card, Switch, Tag, Spin, Alert, Button, Progress } from "antd";
 import {
   TruckOutlined,
   UserOutlined,
@@ -12,8 +12,8 @@ import {
   DeliveredProcedureOutlined,
   ToolOutlined,
 } from "@ant-design/icons";
-import { useAppDispatch } from "../hooks";
-import { fitBounds } from "../mapSlice";
+import { useSelector } from "react-redux";
+import { useGetDriversQuery } from "../orderSlice";
 
 type DeliveryCardProps = {
   orderId: number;
@@ -28,7 +28,6 @@ const DeliveryCard = React.memo(
       isError,
     } = useGetOrderDetailsQuery(orderId);
     const [changeActive] = useChangeActiveMutation();
-    const dispatch = useAppDispatch();
 
     if (isLoading) {
       return <Spin />;
@@ -61,6 +60,25 @@ const DeliveryCard = React.memo(
       }
     };
 
+    const DriverProgress = ({ driverId }: { driverId: number }) => {
+      const { driver } = useGetDriversQuery(undefined, {
+        selectFromResult: ({ data }) => ({
+          driver: data?.find((d) => d.id === driverId),
+        }),
+      });
+
+      const progressPercent =
+        driver?.geojson?.properties?.progress_percent ?? 0;
+
+      return (
+        <Progress
+          percent={progressPercent}
+          size="small"
+          status={progressPercent === 100 ? "success" : "active"}
+        />
+      );
+    };
+
     return (
       <Card
         style={{ marginBottom: 4 }}
@@ -91,10 +109,14 @@ const DeliveryCard = React.memo(
             <UserOutlined className="mr-2" />
             <strong>Contact:</strong> {order.contact?.name}
           </p>
-          <p>
-            <TruckOutlined className="mr-2" />
-            <strong>Driver:</strong> {order.driver?.name}
-          </p>
+          <div>
+            <div>
+              <TruckOutlined className="mr-2" />
+              <strong>Driver:</strong>
+              {order.driver?.name}
+            </div>
+            {order.driver?.id && <DriverProgress driverId={order.driver.id} />}
+          </div>
           <Button onClick={handleShowDetails}>Show More...</Button>
         </div>
       </Card>

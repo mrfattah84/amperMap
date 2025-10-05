@@ -1,13 +1,18 @@
-import React, { useRef, useEffect } from "react";
+import React, { useRef, useEffect, use } from "react";
 import maplibregl from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
-import { ExpandedOrder, useGetExpandedOrdersQuery } from "../orderSlice";
+import {
+  ExpandedOrder,
+  useGetExpandedOrdersQuery,
+  useGetDriversQuery,
+} from "../orderSlice";
 import createNumberedPin from "./customMarker";
 import { useAppDispatch } from "../hooks";
 import { fitBounds, setMapInstance } from "../mapSlice";
 
 function MapComponent({ onMarkerClick }) {
   const { data: orders = [] } = useGetExpandedOrdersQuery();
+  const { data: drivers = [] } = useGetDriversQuery();
   const dispatch = useAppDispatch();
 
   const mapContainer = useRef(null);
@@ -139,6 +144,81 @@ function MapComponent({ onMarkerClick }) {
       markersRef.current = [];
     };
   }, [orders, dispatch, onMarkerClick]);
+
+  useEffect(() => {
+    if (!map.current) return;
+
+    drivers.forEach((driver) => {
+      const sourceId = `driver-${driver.id}`;
+      const pathSourceId = `driver-path-${driver.id}`;
+      const layerId = `driver-layer-${driver.id}`;
+      const pathLayerId = `driver-path-layer-${driver.id}`;
+
+      // Update driver marker (Point)
+      if (driver.geojson?.geometry?.coordinates) {
+        const source = map.current.getSource(sourceId);
+        if (source) {
+          // If source exists, just update the data
+          source.setData(driver.geojson);
+        } else {
+          // Otherwise, add a new source and a layer to render it
+          map.current.addSource(sourceId, {
+            type: "geojson",
+            data: driver.geojson,
+          });
+
+          map.current.addLayer({
+            id: layerId,
+            type: "circle",
+            source: sourceId,
+            paint: {
+              "circle-radius": 8,
+              "circle-color": "#007cbf", // A nice blue color for drivers
+              "circle-stroke-width": 2,
+              "circle-stroke-color": "white",
+            },
+          });
+        }
+      }
+
+      // Update driver path (LineString)
+      const pathCoordinates = driver.geojson?.properties?.path;
+      if (pathCoordinates && pathCoordinates.length > 1) {
+        const pathGeoJson = {
+          type: "Feature",
+          properties: {},
+          geometry: {
+            type: "LineString",
+            coordinates: pathCoordinates,
+          },
+        };
+
+        const pathSource = map.current.getSource(pathSourceId);
+        if (pathSource) {
+          pathSource.setData(pathGeoJson);
+        } else {
+          map.current.addSource(pathSourceId, {
+            type: "geojson",
+            data: pathGeoJson,
+          });
+
+          map.current.addLayer({
+            id: pathLayerId,
+            type: "line",
+            source: pathSourceId,
+            layout: {
+              "line-join": "round",
+              "line-cap": "round",
+            },
+            paint: {
+              "line-color": "#888",
+              "line-width": 4,
+            },
+          });
+        }
+      }
+    });
+  }, [drivers]);
 
   return <div ref={mapContainer} style={{ width: "100%", height: "100%" }} />;
 }
